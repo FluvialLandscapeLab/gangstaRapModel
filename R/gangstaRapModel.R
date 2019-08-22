@@ -1,11 +1,14 @@
-
 # remember that executeRapper() already iterates and updates drivingValues to
 # match the iteration you are on. Write this function for 1 single iteration,
 # which will then be iterated using lapply in executeRapper.
+# Why is the default for this function parent.frame()????
 gangstaModel = function(rapper = parent.frame()){
   if(timestep > 0){
     # get solved values from prior time step
-    solvedValues = gangsta::getSolvedValues(finalValueNames, rapper)
+    # Where is this getSolvedValues function????
+    # solvedValues = gangsta::getSolvedValues(finalValueNames, rapper)
+    finalValueIndex = match(finalValueNames, dimnames(lpModel)[[2]])
+    solvedValues = lpSolveAPI::get.variables(lpModel)[finalValueIndex]
     names(solvedValues) = initialValueNames
     # get leak in values
     plusValues = unlist(mget(addToValueNames, envir = rapper))
@@ -21,8 +24,8 @@ gangstaModel = function(rapper = parent.frame()){
           columns = initValueColumnNumber
         )
       },
-      solvedValues,
-      match(initialValueNames, dimnames(lpModel)[[2]])
+      solvedValue = solvedValues,
+      initValueColumnNumber = match(initialValueNames, dimnames(lpModel)[[2]])
     )
   }
   if(dynamicRespiration){

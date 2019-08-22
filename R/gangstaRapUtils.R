@@ -26,8 +26,11 @@ getLeakInValueNames = function(initialValueNames, drivingValues) {
   return(addToValueNames)
 }
 
+get.matRow <- function(rowNum, lpModel){
+  sapply(1:ncol(lpModel), function(colNum) {lpSolveAPI::get.mat(i = rowNum, j = colNum, lprec = lpModel)})
+}
 
-# helper function that returns the row number of a constraint.  The
+# helper function that returns the row and column numbers of a constraint.  The
 # "constraintID" is a vector of variables names used by the constraint.
 findConstraintRowAndColumn = function(constraintID, lpModel) {
   # check to be sure all variable names in the constraintID are in the model.
@@ -36,15 +39,16 @@ findConstraintRowAndColumn = function(constraintID, lpModel) {
     stop("Variable(s) named '", paste(constraintID[badName], collapse = "', '"), "' are not in the model.")
   }
 
-  modelVarNames = get.lpModelVarNames(lpModel)
+  modelVarNames = dimnames(lpModel)[[2]]
 
   # the model has a matrix where each row represents a constraint and each
-  # column represents the slopes associated with the variable for the
-  # constraint. So, identifying a constraint row means that we find the row
+  # column represents a variable. Each value in the matrix is a slope
+  # associated with one variable and one constraint.
+  # So, identifying a constraint row means that we find the row
   # with no-zero slopes for each variable in the constraintID and zero slope
   # for every variable not in the constraintID.
 
-  # the follow columns need to have non-zero slopes
+  # the following columns need to have non-zero slopes
   constraintColumns = match(constraintID, modelVarNames)
   constraintColumn = constraintColumns[1]
 
