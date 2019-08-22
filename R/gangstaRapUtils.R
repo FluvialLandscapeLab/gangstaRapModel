@@ -26,6 +26,9 @@ getLeakInValueNames = function(initialValueNames, drivingValues) {
   return(addToValueNames)
 }
 
+get.matRow <- function(rowNum, lpModel){
+  sapply(1:ncol(lpModel), function(colNum) {lpSolveAPI::get.mat(i = rowNum, j = colNum, lprec = lpModel)})
+}
 
 # helper function that returns the row number of a constraint.  The
 # "constraintID" is a vector of variables names used by the constraint.
@@ -36,7 +39,7 @@ findConstraintRowAndColumn = function(constraintID, lpModel) {
     stop("Variable(s) named '", paste(constraintID[badName], collapse = "', '"), "' are not in the model.")
   }
 
-  modelVarNames = get.lpModelVarNames(lpModel)
+  modelVarNames = dimnames(lpModel)[[2]]
 
   # the model has a matrix where each row represents a constraint and each
   # column represents the slopes associated with the variable for the
