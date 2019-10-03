@@ -1,3 +1,4 @@
+#'@export
 getValueNamesToUpdate = function(lpModel){
   # get variable names from model
   modelVarNames = dimnames(lpModel)[[2]]
@@ -15,6 +16,7 @@ getValueNamesToUpdate = function(lpModel){
   return(list(initialValueNames = initialValueNames, finalValueNames = finalValueNames))
 }
 
+#'@export
 getLeakInValueNames = function(initialValueNames, drivingValues) {
   addToValueNames = paste0("add.to.", initialValueNames)
   hasLeakIn = addToValueNames %in% names(drivingValues)
@@ -26,20 +28,22 @@ getLeakInValueNames = function(initialValueNames, drivingValues) {
   return(addToValueNames)
 }
 
+#'@export
 get.matRow <- function(rowNum, lpModel){
   sapply(1:ncol(lpModel), function(colNum) {lpSolveAPI::get.mat(i = rowNum, j = colNum, lprec = lpModel)})
 }
 
+
 # helper function that returns the row and column numbers of a constraint.  The
 # "constraintID" is a vector of variables names used by the constraint.
+#'@export
 findConstraintRowAndColumn = function(constraintID, lpModel) {
+  modelVarNames = dimnames(lpModel)[[2]]
   # check to be sure all variable names in the constraintID are in the model.
-  badName = !constraintID %in% dimnames(lpModel)[[2]]
+  badName = !constraintID %in% modelVarNames
   if(any(badName)) {
     stop("Variable(s) named '", paste(constraintID[badName], collapse = "', '"), "' are not in the model.")
   }
-
-  modelVarNames = dimnames(lpModel)[[2]]
 
   # the model has a matrix where each row represents a constraint and each
   # column represents a variable. Each value in the matrix is a slope
@@ -49,6 +53,7 @@ findConstraintRowAndColumn = function(constraintID, lpModel) {
   # for every variable not in the constraintID.
 
   # the following columns need to have non-zero slopes
+  # First variable name is the one that gets updated
   constraintColumns = match(constraintID, modelVarNames)
   constraintColumn = constraintColumns[1]
 
@@ -71,6 +76,7 @@ findConstraintRowAndColumn = function(constraintID, lpModel) {
 }
 
 # getModelMatrix returns a matrix for the solved lpModel
+#'@export
 getModelMatrix = function(envir){
   mat = matrix(
     mapply(
@@ -83,3 +89,77 @@ getModelMatrix = function(envir){
     dimnames = dimnames(envir$lpModel)
   )
 }
+
+# Make a driving variables DF 
+#'@export
+makeDrivingValuesDF <- function(leakInDF, drivingValues, namesToUpdateList){
+  if(!is.null(leakInDF)){
+    if(is.null(drivingValues)){
+      drivingValues <- leakInDF
+      row.names(drivingValues) <- 0:(nrow(drivingValues)-1)
+      return(drivingValues)
+    }else{
+      drivingValues <- cbind(drivingValues, leakInDF)
+      row.names(drivingValues) <- 0:(nrow(drivingValues)-1)
+      return(drivingValues)
+    }
+  }else if(is.null(drivingValues)){
+    stop("Either a list of driving values or a leak in list, or both, must be provided")
+  }
+}
+
+# Update a parameter, lpModel variable, or lpModel slope given
+# an ID (name of parameter in rapper, name of variable in model, or row and column of constraint),
+# and a calculation (numeric constant, expression, character vector, or function)
+#'@export
+update <- function(update, rapper){
+  # Determine the type of the calculation (constant, expression, character vector, or function) 
+  # and calculate the new variable accordingly
+  if(class(update$calculation) == "numeric"){
+    newValue <- update$calculation
+  }else if(class(update$calculation) == "expression"){
+    newValue <- do.call(what = eval, 
+                        args = list(expr = update$calculation),
+                        envir = rapper)
+  }else if(class(update$calculation) == "character"){
+    newValue <- get(update$calculation, envir = rapper)
+  }else if(class(update$calculation[1]) == "function"){
+    if(length(update$calculation)>1){
+      args <- as.list(update$calculation[2:length(update$calculation)])
+    }else{args <- list()}
+    args <- update$calculation
+    newValue <- do.call(what = update$calculation[1],
+                        args = args, 
+                        envir = rapper)
+  }
+  
+  # Determine whether the value to be updated is an lpModel variable, lpModel slope, or rapper variable
+  # and update the value in the appropriate location(s).
+  if(update$ID %in% rapper$lpModelNames){
+    # If ID represents an lpModel variable, set the value of the lpModel variable both
+    # in the lpModel and in the rapper environment
+    lpSolveAPI::set.bounds(
+      rapper$lpModel,
+      lower = newValue,
+      upper = newValue,
+      columns = match(update$ID, rapper$lpModelNames)
+    )
+    # Preprocessor that replaces list of variables associated with constraint with a row and column number
+  }else if(length(update$ID) == 2){
+    # If ID represents a slope in the lpModel, set the slope in the lpModel
+    lpSolveAPI::set.mat(
+      rapper$lpModel,
+      i = update$ID["i"],
+      j = update$ID["j"],
+      value = newValue)
+  }else if(update$ID %in% ls(rapper)[!(ls(rapper) %in% rapper$lpModelNames)]){
+    assign(x = update$ID,
+           value = newValue,
+           envir = rapper)
+  }else{
+    stop("The ID of an update must be the name of an lpModel variable,
+         a numeric vector of length two containing the row and column number of the constraint slope to be updated,
+         or the name of a parameter in the rapper environment.")
+  }
+}
+

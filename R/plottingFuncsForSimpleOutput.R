@@ -1,4 +1,3 @@
-<<<<<<< HEAD
 #### Plot Model Results Wrapper ####
 
 # Type can be bar, line, or points
@@ -257,8 +256,7 @@ getColors <- function(ggplotObject, skip = 0){
               "#ff91b3", "#8e7100", "#cd9875","#a70b13","#017ea9")
   colors[(1+skip):(n+skip)]
 }
-||||||| merged common ancestors
-=======
+
 #### Plot Model Results Wrapper ####
 
 # Type can be bar, line, or points
@@ -558,4 +556,3 @@ getColors <- function(ggplotObject, skip = 0){
               "#ff91b3", "#8e7100", "#cd9875","#a70b13","#017ea9")
   colors[(1+skip):(n+skip)]
 }
->>>>>>> cc69a29d4e27c0941fff00b89ef51947c1f0b60c
