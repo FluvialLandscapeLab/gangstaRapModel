@@ -29,7 +29,7 @@ constraintIDs <- list(
   hetRespirationRate = c("Met.finalMolecules", "Met.respirationEnergy")
 )
 
-lpModel = read.lp("/Users/libbymohr-msu/Documents/MSU/RProjects/Microcosm Gangsta/lpFiles/gravelIncubations.lp")
+lpModel = lpSolveAPI::read.lp("/Users/libbymohr-msu/Documents/MSU/RProjects/Microcosm Gangsta/lpFiles/gravelIncubations.lp")
 
 # get the row and column numbers of the model matrix for each constraint in
 # "constraintIDs."

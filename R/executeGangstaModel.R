@@ -30,7 +30,7 @@ executeGangstaModel = function(rapper = parent.frame()){
     )
   }
   # Solve the lp model
-  rapper$objective <- suppressWarnings(lpSolveAPI::solve.lpExtPtr(lpModel))
+  rapper$lpStatus <- suppressWarnings(lpSolveAPI::solve.lpExtPtr(lpModel))
   
   # Get variables from lpModel and set values in environment
   solvedValues <- lpSolveAPI::get.variables(lpModel)
@@ -49,7 +49,6 @@ executeGangstaModel = function(rapper = parent.frame()){
   # Set names of results to names of outputRequest
   names(results) <- names(outputRequest)
   
-  # Update all lpSolve model variables in the rapper environment
   return(results)
 }
 

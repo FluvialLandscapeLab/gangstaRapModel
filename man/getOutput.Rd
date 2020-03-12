@@ -7,7 +7,7 @@
 getOutput(outputRequest, rapper)
 }
 \arguments{
-\item{outputRequest}{A data frame, character vector, or expression vector.}
+\item{outputRequest}{A list, character vector, expression. Lists elements may be expressions, character vectors, or lists of expressions.}
 }
 \value{
 A data frame or vector of requested model output for a single time step.

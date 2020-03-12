@@ -3,14 +3,14 @@
 #'@description Creates a gangstaRapper object. The model is iterated when the 'executeRapper'
 #'function is called with the gangstaRapper object as its argument.
 #'
-#'@param execute
-#'@param drivingValues
+#'@param execute placeholder
+#'@param drivingValues placeholder 
 #'@param leakInDF A data frame where each column is named according to the convention
 #' "add.to.<lpSolveVariableName>" and values in each row represent the amount added to the 
 #'  variable associated with the column during a single timestep.
 #'@param lpModelFilePath the file path for the .lp model as a character string
 #'@param gangstas The list of gangsta objects used to generate the model.
-#'@param updates 
+#'@param updates placeholder
 #'@param outputRequest A list of output requests. If this argument is not supplied, 
 #' a default set of outputs will be generated. 
 #'@param ... Named arguments describing model parameters or initial condition

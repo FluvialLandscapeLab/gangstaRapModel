@@ -1,39 +1,60 @@
 #'@title Get requested model output from an lp Model. 
 #'
-#'@param outputRequest A data frame, character vector, or expression vector. 
+#'@param outputRequest A list, character vector, expression. Lists elements may be expressions, character vectors, or lists of expressions.
 #'
 #'@return A data frame or vector of requested model output for a single time step. 
 #'
 #'@export
 getOutput <- function(outputRequest, rapper){
-  modelVarNames <- dimnames(rapper$lpModel)[[2]]
-  variableOutput <- lpSolveAPI::get.variables(rapper$lpModel)[order(modelVarNames)]
-  names(variableOutput) <- modelVarNames[order(modelVarNames)]
-  variableOutput <- data.frame(variableOutput)
-  if(class(outputRequest) == "data.frame"){
-    outputList <- lapply(1:ncol(outputRequest), 
+  if(typeof(outputRequest)=="list"){
+    outputList <- lapply(outputRequest, 
                          function(i){
-                           if(all(outputRequest[i] %in% modelVarNames)&class(outputRequest[i]) == "character"){
-                             return(variableOutput[outputRequest[i],])
-                           }else if(class(outputRequest[i]) == "expression"){
-                             return(sapply(outputRequest[i], eval))
+                           if(class(i) == "character"){
+                             return(getCharVecOutput(charVec = i, rapper = rapper))
+                           }else if(class(i)== "expression"){
+                             return(eval(i, envir = rapper))
+                           }else if(all(sapply(i, class)== "expression")){
+                             return(getExprListOutput(exprList = i, rapper = rapper))
                            }else{
-                             return(outputRequest[i])
+                             return(i)
                            }
                          }
     )
-    outputDF <- data.frame(outputList)
-    names(outputDF) <- names(outputRequest)
-    row.names(outputDF) <- row.names(outputRequest)
+    if(class(outputRequest[[1]][[1]]) == "call"){
+      output <- simplify2array(outputList)
+      names(output) <- names(outputRequest)
+    }else{
+      output <- data.frame(outputList,
+                           stringsAsFactors = FALSE)
+      if(!is.null(rownames(outputRequest))){
+        rownames(output) <- rownames(outputRequest)
+      }
+    }
+    names(output) <- names(outputRequest)
+    row.names(output) <- row.names(outputRequest)
   }else if(class(outputRequest) == "character"){
-    #output <- variableOutput[outputRequest,]
-    output <- sapply(outputRequest, eval)
-    namesOutput <- outputRequest
-    return(output)
-  }else if(class(outputRequest) == "expression"){
-    output <- sapply(outputRequest, eval)
-    return(output)
+    output<- getCharVecOutput(charVec = outputRequest, rapper = rapper)
+    names(output) <- names(outputRequest)
+  }else if(class(outputRequest) == "expression"|| class(outputRequest) == "call"){
+    output <- eval(outputRequest, envir=rapper)
+    names(output) <- names(outputRequest)
   }else{
     stop("Output request must be a data frame, character vector, or expression vector")
   }
+  return(output)
+}
+
+getCharVecOutput<- function(charVec, rapper){
+  if(all(charVec %in% ls(rapper))){
+    output <- simplify2array(mget(x = charVec, envir = rapper))
+  }else{
+    output <- charVec
+  }
+  return(output)
+}
+
+getExprListOutput<- function(exprList, rapper){
+  output <- sapply(exprList, eval, envir = rapper)
+  names(output)<-names(exprList)
+  return(output)
 }
