@@ -19,7 +19,7 @@ defaultOutput <- function(gangstas){
                            stringsAsFactors = F)
   poolValsDF <- poolValsDF[elementIdx, ]
   
-  # Make transfer values data frames
+  # Make transfer values request lists
   transClassName <- gangsta:::gangstaClassName("trans")
   procAttrName <- gangsta:::gangstaAttributeName("procName")
   nameAttrName <- gangsta:::gangstaAttributeName("name")
@@ -35,7 +35,7 @@ defaultOutput <- function(gangstas){
                                            molTransfered = transferMolTransVars,
                                            stringsAsFactors = F)
   row.names(molTransferValsDFbyProcess) <- transferMolTransVars
-  
+  # Summarize by to pool and from pools to request total mols transferred from one pool to another by any process
   molTransferValsDF <-  molTransferValsDFbyProcess %>% 
     group_by(fromPool, toPool) %>% 
     summarise_at(.vars = vars(molTransfered), .funs = function(x){paste(x, collapse = "+")})
@@ -43,7 +43,7 @@ defaultOutput <- function(gangstas){
                           toPool = molTransferValsDF$toPool,
                           molTransfered = lapply(molTransferValsDF$molTransfered, function(x) parse(text = x)))
   
-  # Make compound values data frame
+  # Make compound values request list
   compounds <-  subsetGangstas(gangstas, "class", gangsta:::gangstaClassName("comp"))
   compoundNames <-  getGangstaAttribute(compounds, gangsta:::gangstaAttributeName("name"))
   initCompoundNames <-  gangsta:::makeCompoundStartMolVars(compoundNames)
@@ -66,6 +66,32 @@ defaultOutput <- function(gangstas){
   poolMolsAdded <- lapply(poolMolsAdded, function(x) parse(text = x))
   names(poolMolsAdded) <- names(pools)
   
+  # Make request list for process energy values
+  processes <- subsetGangstas(gangstas, "class", gangsta:::gangstaClassName("proc"))
+  processNames <- getGangstaAttribute(processes, gangsta:::gangstaAttributeName("name"))
+  processEnergy <- getGangstaAttribute(processes, gangsta:::gangstaAttributeName("energy"))
+  # Decay is neither catabolic or anabolic because it neither generates nor consumes energy, so we remove it:
+  processEnergy <- processEnergy[-grep("Decay", names(processEnergy))]
+  processNames <- processNames[-grep("Decay", processNames)]
+  energyVarNames <- gangsta:::makeProcessEnergyVars(processNames)
+  # Make a vector of 
+  procType <- character(length(processEnergy))
+  procType[processEnergy>0] <- "catabolic"
+  procType[processEnergy<0] <- "anabolic"
+  processEnergyVals <- data.frame(energy = energyVarNames,
+                                  procType = procType,
+                                  stringsAsFactors = FALSE,
+                                  row.names = processNames)
+  
+  # Make request list for process energy values
+  respEnergyVarName <- gangsta:::gangstaVarName("respEnergy")
+  organismClassName <- gangsta:::gangstaClassName("org")
+  organisms <- subsetGangstas(gangstas, "class", organismClassName)
+  organismNames <- getGangstaAttribute(organisms, nameAttrName)
+  
+  respirationEnergyVals <- gangsta:::makeGenericVars(organismNames, "respEnergy")
+  names(respirationEnergyVals) <- respirationEnergyVals
+  
   outputRequestList <- list(
     objective = parse(text= "lpSolveAPI::get.objective(lpModel)"),
     status = "lpStatus", 
@@ -74,9 +100,9 @@ defaultOutput <- function(gangstas){
     molTransferValsByProcess = molTransferValsDFbyProcess,
     leakInPoolVals = poolMolsAdded,
     leakInCompoundVals = compoundMolsAdded,
-    compoundVals = compoundVals#,
-    #processEnergyVals = NULL,
-    #respirationEnergyVals = NULL
+    compoundVals = compoundVals,
+    processEnergyVals = processEnergyVals,
+    respirationEnergyVals = respirationEnergyVals
   )
   return(outputRequestList)
 }
