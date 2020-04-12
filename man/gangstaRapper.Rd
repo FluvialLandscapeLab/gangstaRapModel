@@ -12,15 +12,21 @@ gangstaRapper(
   lpModelFilePath,
   gangstas,
   updates = list(),
-  outputRequest = NULL,
+  outputRequest = NA,
   ...,
   initValues = list()
 )
 }
 \arguments{
-\item{execute}{placeholder}
+\item{execute}{A function that gets called iteratively, i.e. once per time step. 
+The default is \code{executeGangstaModel}, which updates and then solves the lpModel
+and returns output specified in the outputRequest.}
 
-\item{drivingValues}{placeholder}
+\item{drivingValues}{A \code{data.frame} with columns named for driving
+variables required by the function associated with the \code{execute} argument.
+Each row represents the values of the driving variables for one timestep.
+The \code{row.names} must be equal to \code{0:nTimeSteps} where nTimeSteps
+is the number of timesteps to execute the simulation.}
 
 \item{leakInDF}{A data frame where each column is named according to the convention
 "add.to.<lpSolveVariableName>" and values in each row represent the amount added to the 

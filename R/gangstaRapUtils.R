@@ -92,74 +92,82 @@ getModelMatrix = function(envir){
 
 # Make a driving variables DF 
 #'@export
-makeDrivingValuesDF <- function(leakInDF, drivingValues, namesToUpdateList){
+makeDrivingValuesDF <- function(leakInDF = NULL, drivingValues){
   if(!is.null(leakInDF)){
     if(is.null(drivingValues)){
       drivingValues <- leakInDF
       row.names(drivingValues) <- 0:(nrow(drivingValues)-1)
-      return(drivingValues)
     }else{
       drivingValues <- cbind(drivingValues, leakInDF)
       row.names(drivingValues) <- 0:(nrow(drivingValues)-1)
-      return(drivingValues)
     }
   }else if(is.null(drivingValues)){
     stop("Either a list of driving values or a leak in list, or both, must be provided")
   }
+  return(drivingValues)
 }
 
 # Update a parameter, lpModel variable, or lpModel slope given
 # an ID (name of parameter in rapper, name of variable in model, or row and column of constraint),
 # and a calculation (numeric constant, expression, character vector, or function)
 #'@export
-update <- function(update, rapper){
+update <- function(updateMethod, rapper){
+  
+  #TODO: change "update" to updateMethod to avoid duplicate naming
+  
   # Determine the type of the calculation (constant, expression, character vector, or function) 
   # and calculate the new variable accordingly
-  if(class(update$calculation) == "numeric"){
-    newValue <- update$calculation
-  }else if(class(update$calculation) == "expression"){
-    newValue <- do.call(what = eval, 
-                        args = list(expr = update$calculation),
-                        envir = rapper)
-  }else if(class(update$calculation) == "character"){
-    newValue <- get(update$calculation, envir = rapper)
-  }else if(class(update$calculation[1]) == "function"){
-    if(length(update$calculation)>1){
-      args <- as.list(update$calculation[2:length(update$calculation)])
+  if(class(updateMethod$calculation) == "numeric"){
+    newValue <- updateMethod$calculation
+  }else if(class(updateMethod$calculation) == "expression"){
+    newValue <- eval(expr = updateMethod$calculation,
+                     envir = rapper)
+  }else if(class(updateMethod$calculation) == "character"){
+    newValue <- get(updateMethod$calculation, 
+                    envir = rapper)
+  }else if(class(updateMethod$calculation[[1]]) == "function"){
+    if(length(updateMethod$calculation)>1){
+      args <- as.list(updateMethod$calculation[2:length(updateMethod$calculation)])
     }else{args <- list()}
-    args <- update$calculation
-    newValue <- do.call(what = update$calculation[1],
+    newValue <- do.call(what = updateMethod$calculation[[1]],
                         args = args, 
                         envir = rapper)
   }
   
+  # TODO: Should put an else with an error statement
+  
   # Determine whether the value to be updated is an lpModel variable, lpModel slope, or rapper variable
   # and update the value in the appropriate location(s).
-  if(update$ID %in% rapper$lpModelNames){
+  if(updateMethod$ID %in% rapper$lpModelNames){
     # If ID represents an lpModel variable, set the value of the lpModel variable both
     # in the lpModel and in the rapper environment
     lpSolveAPI::set.bounds(
       rapper$lpModel,
       lower = newValue,
       upper = newValue,
-      columns = match(update$ID, rapper$lpModelNames)
+      columns = match(updateMethod$ID, rapper$lpModelNames)
     )
     # Preprocessor that replaces list of variables associated with constraint with a row and column number
-  }else if(length(update$ID) == 2){
+  }else if(length(updateMethod$ID) == 2){
     # If ID represents a slope in the lpModel, set the slope in the lpModel
     lpSolveAPI::set.mat(
       rapper$lpModel,
-      i = update$ID["i"],
-      j = update$ID["j"],
+      i = updateMethod$ID["i"],
+      j = updateMethod$ID["j"],
       value = newValue)
-  }else if(update$ID %in% ls(rapper)[!(ls(rapper) %in% rapper$lpModelNames)]){
-    assign(x = update$ID,
+  }else if(updateMethod$ID %in% ls(rapper)[!(ls(rapper) %in% rapper$lpModelNames)]){
+    assign(x = updateMethod$ID,
            value = newValue,
            envir = rapper)
   }else{
-    stop("The ID of an update must be the name of an lpModel variable,
-         a numeric vector of length two containing the row and column number of the constraint slope to be updated,
-         or the name of a parameter in the rapper environment.")
+    stop(
+      "The ID of an update must be the name of an lpModel variable, a numeric vector of length 
+      two containing the row and column number of the constraint slope to be updated,
+      or the name of a parameter in the rapper environment."
+    )
   }
 }
 
+shortls = function(env){
+  ls(env, pattern = "^[^.]+$")
+  }

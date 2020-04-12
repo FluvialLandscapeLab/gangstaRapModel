@@ -3,9 +3,8 @@ library(ggplot2)
 library(ggsci)
 library(RColorBrewer)
 library(dplyr)
-source("/Users/libbymohr-msu/Documents/MSU/RProjects/Microcosm Gangsta/Plot/plottingFuncs_new.R")
+source("/Users/libbymohr-msu/Documents/MSU/RProjects/gangstaSandbox/Plot/plottingFuncs_new.R")
 source("/Users/libbymohr-msu/Documents/MSU/RProjects/gangstaRapper/mesocosm.R")
-source("/Users/libbymohr-msu/Documents/MSU/RProjects/gangstaRapper/plottingFuncs")
 
 #### Plot Energies ####
 energiesPlot <- plotModelResults(results = results, 

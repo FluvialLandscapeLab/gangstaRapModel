@@ -3,8 +3,14 @@
 #'@description Creates a gangstaRapper object. The model is iterated when the 'executeRapper'
 #'function is called with the gangstaRapper object as its argument.
 #'
-#'@param execute placeholder
-#'@param drivingValues placeholder 
+#'@param execute A function that gets called iteratively, i.e. once per time step. 
+#' The default is \code{executeGangstaModel}, which updates and then solves the lpModel
+#' and returns output specified in the outputRequest.
+#'@param drivingValues A \code{data.frame} with columns named for driving
+#'   variables required by the function associated with the \code{execute} argument.
+#'   Each row represents the values of the driving variables for one timestep.
+#'   The \code{row.names} must be equal to \code{0:nTimeSteps} where nTimeSteps
+#'   is the number of timesteps to execute the simulation.
 #'@param leakInDF A data frame where each column is named according to the convention
 #' "add.to.<lpSolveVariableName>" and values in each row represent the amount added to the 
 #'  variable associated with the column during a single timestep.
@@ -29,7 +35,7 @@ gangstaRapper <- function(execute = executeGangstaModel,
                           lpModelFilePath, 
                           gangstas,
                           updates = list(),
-                          outputRequest = NULL,
+                          outputRequest = NA,
                           ...,
                           initValues = list()){
   # Read the lpModel from file path
@@ -40,11 +46,10 @@ gangstaRapper <- function(execute = executeGangstaModel,
   
   # Make a data frame of driving values
   drivingValues <- makeDrivingValuesDF(drivingValues = drivingValues, 
-                                       leakInDF = leakInDF,
-                                       namesToUpdateList = namesToUpdateList) 
+                                       leakInDF = leakInDF) 
 
   # Make output request if NULL
-  if(is.null(outputRequest)){outputRequest <- defaultOutput(gangstas)}
+  if(is.na(outputRequest)){outputRequest <- defaultOutput(gangstas)}
   
   # Get names of lpModelVariables
   lpModelNames <- dimnames(lpModel)[[2]]

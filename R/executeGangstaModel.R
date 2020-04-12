@@ -14,9 +14,9 @@
 #'@export
 executeGangstaModel = function(rapper = parent.frame()){
   if(timestep > 0){
+    # Update variables in the rapper environment based on a user supplied list of updates and update functions
     do.call(what = lapply, args = list(X = updates, FUN = update, rapper = rapper), envir = rapper)
-    # lapply(X = updates, FUN = update, rapper = rapper)
-    
+
     # For lpModel variables whose names are not in the update list, set the initial value 
     # equal to the final value from the previous timestep. 
     finalValueIndex <- match(finalValueNamesNotInUpdateList, lpModelNames)
@@ -40,10 +40,6 @@ executeGangstaModel = function(rapper = parent.frame()){
          MoreArgs = list(envir = rapper))
 
   # Get output 
-  # results <- do.call(what = lapply, 
-  #                    args = list(X = outputRequest, FUN = getOutput),
-  #                    envir = rapper)
-  # Alternatively, pass the gangsta rapper to this call: 
   results <- lapply(outputRequest, getOutput, rapper = rapper)
   
   # Set names of results to names of outputRequest

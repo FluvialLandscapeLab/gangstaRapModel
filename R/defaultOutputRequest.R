@@ -52,7 +52,7 @@ defaultOutput <- function(gangstas){
   change <- lapply(change, function(x) parse(text = x))
   compoundVals <- list(compoundName = compoundNames, 
                        change = change,
-                       intitial = initCompoundNames,
+                       initial = initCompoundNames,
                        final = finalCompoundNames)
   
   # Make lists for leakInCompoundVals, leakInPoolVals 
