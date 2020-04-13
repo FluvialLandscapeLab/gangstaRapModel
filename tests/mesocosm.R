@@ -15,7 +15,8 @@ drivingValues <- data.frame(
 )
 
 # Make rapper object
-mesocosmRapper <- gangstaRapper(drivingValues = drivingValues,
+mesocosmRapper <- gangstaRapper(execute = list(preModelUpdates, solveModel, updatelpSolveVarsInRapper, storeOutput),
+                                drivingValues = drivingValues,
                                 lpModelFilePath = "/Users/libbymohr-msu/Documents/MSU/RProjects/gangstaSandbox/lpFiles/gravelIncubations.lp", 
                                 gangstas = myGangstas,
                                 updates = list(list(ID = "H2.initialMolecules",

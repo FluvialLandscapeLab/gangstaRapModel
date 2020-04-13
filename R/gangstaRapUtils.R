@@ -112,9 +112,6 @@ makeDrivingValuesDF <- function(leakInDF = NULL, drivingValues){
 # and a calculation (numeric constant, expression, character vector, or function)
 #'@export
 update <- function(updateMethod, rapper){
-  
-  #TODO: change "update" to updateMethod to avoid duplicate naming
-  
   # Determine the type of the calculation (constant, expression, character vector, or function) 
   # and calculate the new variable accordingly
   if(class(updateMethod$calculation) == "numeric"){
@@ -123,8 +120,8 @@ update <- function(updateMethod, rapper){
     newValue <- eval(expr = updateMethod$calculation,
                      envir = rapper)
   }else if(class(updateMethod$calculation) == "character"){
-    newValue <- get(updateMethod$calculation, 
-                    envir = rapper)
+    newValue <- simplify2array(mget(x = updateMethod$calculation,
+                                    envir = rapper))
   }else if(class(updateMethod$calculation[[1]]) == "function"){
     if(length(updateMethod$calculation)>1){
       args <- as.list(updateMethod$calculation[2:length(updateMethod$calculation)])
@@ -132,9 +129,9 @@ update <- function(updateMethod, rapper){
     newValue <- do.call(what = updateMethod$calculation[[1]],
                         args = args, 
                         envir = rapper)
+  }else{
+    error('updateMethod$calculation must be an expression, function/argument list, character vector, or numeric vector')
   }
-  
-  # TODO: Should put an else with an error statement
   
   # Determine whether the value to be updated is an lpModel variable, lpModel slope, or rapper variable
   # and update the value in the appropriate location(s).
@@ -155,19 +152,28 @@ update <- function(updateMethod, rapper){
       i = updateMethod$ID["i"],
       j = updateMethod$ID["j"],
       value = newValue)
-  }else if(updateMethod$ID %in% ls(rapper)[!(ls(rapper) %in% rapper$lpModelNames)]){
-    assign(x = updateMethod$ID,
+  }else if(all(updateMethod$ID %in% ls(rapper)[!(ls(rapper) %in% rapper$lpModelNames)])){
+    # If ID is a rapper variable name (or a vector of rapper variable names), 
+    # assign the calculated value(s) to the name of the rapper object (s)
+    mapply(assign,
+           x = updateMethod$ID,
            value = newValue,
-           envir = rapper)
+           MoreArgs = list(envir = rapper))
   }else{
     stop(
       "The ID of an update must be the name of an lpModel variable, a numeric vector of length 
       two containing the row and column number of the constraint slope to be updated,
-      or the name of a parameter in the rapper environment."
+      the name of a parameter in the rapper environment, or a vector of rapper variable names"
     )
   }
 }
 
+# This function could be used to get a list of lpSolve variable names in the rapper environment. 
 shortls = function(env){
   ls(env, pattern = "^[^.]+$")
-  }
+}
+
+
+
+
+

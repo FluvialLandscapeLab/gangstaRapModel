@@ -48,4 +48,49 @@ executeGangstaModel = function(rapper = parent.frame()){
   return(results)
 }
 
+#'@export
+preModelUpdates <- function(rapper = parent.frame()){
+  if(timestep > 0){
+    # Update variables in the rapper environment based on a user supplied list of updates and update functions
+    do.call(what = lapply, args = list(X = updates, FUN = update, rapper = rapper), envir = rapper)
+    
+    # For lpModel variables whose names are not in the update list, set the initial value 
+    # equal to the final value from the previous timestep. 
+    finalValueIndex <- match(finalValueNamesNotInUpdateList, lpModelNames)
+    newInitVals <- lpSolveAPI::get.variables(lpModel)[finalValueIndex]
+    names(newInitVals) <- initialValuesNamesNotInUpdateList
+    lpSolveAPI::set.bounds(
+      lpModel,
+      lower = newInitVals,
+      upper = newInitVals,
+      columns = match(initialValuesNamesNotInUpdateList, lpModelNames)
+    )
+  }
+}
 
+#'@export
+solveModel <- function(rapper = parent.frame()){
+  # Solve the lp model
+  rapper$lpStatus <- suppressWarnings(lpSolveAPI::solve.lpExtPtr(lpModel))
+}
+
+#'@export
+updatelpSolveVarsInRapper <- function(rapper = parent.frame()){
+  # Get variables from lpModel and set values in environment
+  solvedValues <- lpSolveAPI::get.variables(lpModel)
+  mapply(assign, 
+         x = lpModelNames, 
+         value = solvedValues, 
+         MoreArgs = list(envir = rapper))
+} 
+
+#'@export
+storeOutput <- function(rapper = parent.frame()){
+  # Get output 
+  results <- lapply(outputRequest, getOutput, rapper = rapper)
+  
+  # Set names of results to names of outputRequest
+  names(results) <- names(outputRequest)
+  
+  return(results)
+}
