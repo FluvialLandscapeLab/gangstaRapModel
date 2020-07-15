@@ -84,6 +84,21 @@ updatelpSolveVarsInRapper <- function(rapper = parent.frame()){
          MoreArgs = list(envir = rapper))
 } 
 
+#'@title Calculate new isotopic compositions resulting from transfers and update variables.
+#'
+#'@description  Calculates the new isotopic composition of compound pools based
+#'  on the amount of compound transferred to and from the pool, the isotopic
+#'  compositions of "from" pools and leak ins, and the isotopic composition of the compound
+#'  pool at the beginning of the time step.
+#'
+#'@export
+updateIsotopes <- function(rapper = parent.frame()){
+  if(timestep > 0){
+    do.call(what = lapply, args = list(X = initialIsotopeUpdates, FUN = update, rapper = rapper), envir = rapper)
+  }
+   do.call(what = lapply, args = list(X = finalIsotopeUpdates, FUN = update, rapper = rapper), envir = rapper)
+} 
+
 #'@export
 storeOutput <- function(rapper = parent.frame()){
   # Get output 

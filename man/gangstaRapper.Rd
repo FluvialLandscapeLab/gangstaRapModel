@@ -12,7 +12,10 @@ gangstaRapper(
   lpModelFilePath,
   gangstas,
   updates = list(),
-  outputRequest = NA,
+  outputRequest = defaultOutput(gangstas),
+  isotopesToTrack = NA,
+  initialAtomicFractions = NA,
+  isotopeStandards = NA,
   ...,
   initValues = list()
 )
@@ -40,6 +43,13 @@ is the number of timesteps to execute the simulation.}
 
 \item{outputRequest}{A list of output requests. If this argument is not supplied, 
 a default set of outputs will be generated.}
+
+\item{isotopesToTrack}{A named list of numeric vectors where names are elements and vectors
+contain the atomic weight of the isotope to track}
+
+\item{initialAtomicFractions}{A named list of named numeric vectors where the
+names of the list are names of pools, and numeric vectors contain initial
+atomic fractions and are named according to the atomic weight of the isotope}
 
 \item{...}{Named arguments describing model parameters or initial condition
 for state variables where the name of the argument represents the variable

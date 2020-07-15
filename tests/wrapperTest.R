@@ -4,6 +4,7 @@ library(gangsta)
 library(rapper)
 library(gangstaRapper)
 
+###### Test without Isotopes ######
 # Make gangstas and rewrite lpModel
 source("/Users/libbymohr-msu/Documents/MSU/RProjects/gangstaSandbox/makelpFiles/makeMicrocosmModel.R")
 
@@ -28,6 +29,9 @@ mesocosmRapper <- gangstaRapper(execute = list(preModelUpdates, solveModel, upda
 # run the model and return the results
 results <- executeRapper(mesocosmRapper)
 
+
+###### Test with Isotopes ######
+
 # Get initial values from data
 source("/Users/libbymohr-msu/Documents/MSU/RProjects/gangstaSandbox/getModelInitVals.R")
 
@@ -35,9 +39,11 @@ source("/Users/libbymohr-msu/Documents/MSU/RProjects/gangstaSandbox/getModelInit
 AutInitBiomass <- 1
 HetInitBiomass <- 1
 
-initialAFs_DOC <- c("12" = 0.1, "13" = 0.9)
 initialAFs_DIC <- c("12" = 0.9, "13" = 0.1)
 initialAFs_CH4 <- c("12" = 0.1, "13" = 0.9)
+initialAFs_DOC <- c("12" = 0.1, "13" = 0.9)
+RCPDB <- 0.011237
+# https://www.esrl.noaa.gov/gmd/education/isotopes/deltavalues.html
 
 # Make the lp File
 source("/Users/libbymohr-msu/Documents/MSU/RProjects/gangstaSandbox/makelpFiles/batchReactor.R")
@@ -45,30 +51,36 @@ source("/Users/libbymohr-msu/Documents/MSU/RProjects/gangstaSandbox/makelpFiles/
 # Make data frame of driving values
 drivingValues <- data.frame(
   add.to.DIC.initialMolecules = c(0,rep(1, times = 19)),
-  add.to.DIC.initialMolecules.12 = rep(0.9, times = 20),
-  add.to.DIC.initialMolecules.13 = rep(0.1, times = 20),
+  add.to.DIC.initialMolecules.AF.12 = rep(0.9, times = 20),
+  add.to.DIC.initialMolecules.AF.13 = rep(0.1, times = 20),
   row.names = 0:19
 )
 
 # To track isotopes: 
 #   1. add "updateisotopes" to list of execute functions
-#   2. Specify "poolsWithIsotopeTracking", a vector of pool names
-#   3. Initialize isotope variables as a list of two elements: "initial" and "final", 
-#      which are both vectors containing atomic fractions and named according to atomic weight of the isotope. 
-#      The initializeIsotopeVariable utility function makes this a little easier. 
-#   4. Specify isotopic composition of leakIns in the driving variables list, if applicable. 
-#   5. Add isotopes to the output request list
+#   2. Specify "isotopesToTrack", a vector of pool names
+#   3. Specify "isotopeStandards" from which delta values are calculated
+#   4. Specify "initialAtomicFractions", a named list where list elements are named by pool and consist of
+#      a named vector.The vector contains initial atomic fractions and is named according to atomic weight of the isotope. 
+#   5. Specify isotopic composition of leakIns in the driving variables list, if applicable. The naming convention is
+#      "add.to.<poolName>.initialMolecules.AF.AtomicMass"
+#   6. Make the output request list with "defaultOutputWithIsotopes"
 # Make rapper object with isotope calculations included
-brRapperWithIsotopes <- gangstaRapper(execute = list(preModelUpdates, solveModel, updatelpSolveVarsInRapper, updateisotopes, storeOutput),
+brRapperWithIsotopes <- gangstaRapper(execute = list(preModelUpdates, solveModel, updatelpSolveVarsInRapper, updateIsotopes, storeOutput),
                                       drivingValues = drivingValues,
                                       lpModelFilePath = "/Users/libbymohr-msu/Documents/MSU/RProjects/gangstaSandbox/lpFiles/batchReactor.lp", 
                                       gangstas = myGangstas,
-                                      poolsWithIsotopeTracking = c("DIC_C",  "CH4_C"),
-                                      initValues = list("DIC_C.isotopes" = initializeIsotopeVariable(initialAFs_DIC),
-                                                        "CH4_C.isotopes" = initializeIsotopeVariable(initialAFs_CH4)),
-                                      outputRequest = defaultOutputWithIsotopes(myGangstas))
+                                      isotopesToTrack = list("C" = c(12,13)),
+                                      isotopeStandards = c("C" = RCPDB), 
+                                      initialAtomicFractions = list("DIC_C" = initialAFs_DIC,
+                                                                    "DOC_C" = initialAFs_DOC,
+                                                                    "Aut_C" = initialAFs_DOC,
+                                                                    "Het_C" = initialAFs_DOC),
+                                      outputRequest = defaultOutputWithIsotopes(gangsta = myGangstas, 
+                                                                                isotopesToTrack = list("C" = c(12,13)))
+                                      )
 
 # run the model and return the results
-results <- executeRapper(mesocosmRapperWithIsotopes)
+results <- executeRapper(brRapperWithIsotopes)
 
-
+source("/Users/libbymohr-msu/Documents/MSU/RProjects/gangstaSandbox/Plot/plottingFuncs_new.R")

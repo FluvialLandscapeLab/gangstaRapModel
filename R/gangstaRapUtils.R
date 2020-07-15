@@ -145,7 +145,7 @@ update <- function(updateMethod, rapper){
       columns = match(updateMethod$ID, rapper$lpModelNames)
     )
     # Preprocessor that replaces list of variables associated with constraint with a row and column number
-  }else if(length(updateMethod$ID) == 2){
+  }else if((length(updateMethod$ID) == 2) & (all(names(updateMethod$ID) %in% c("i", "j")))){
     # If ID represents a slope in the lpModel, set the slope in the lpModel
     lpSolveAPI::set.mat(
       rapper$lpModel,
@@ -155,10 +155,18 @@ update <- function(updateMethod, rapper){
   }else if(all(updateMethod$ID %in% ls(rapper)[!(ls(rapper) %in% rapper$lpModelNames)])){
     # If ID is a rapper variable name (or a vector of rapper variable names), 
     # assign the calculated value(s) to the name of the rapper object (s)
-    mapply(assign,
-           x = updateMethod$ID,
-           value = newValue,
-           MoreArgs = list(envir = rapper))
+    if(!is.null(names(get(updateMethod$ID, envir = rapper)))){
+      newValueNames <- names(get(updateMethod$ID, envir = rapper))
+    }else{
+      newValueNames <- NULL
+    }
+    assign(x = updateMethod$ID,
+           value = structure(newValue, names = newValueNames),
+           envir = rapper)
+    # mapply(purrr::assign_in,
+    #        x = rapper,
+    #        where = updateMethod$ID,
+    #        value = structure(newValue, names = newValueNames))
   }else{
     stop(
       "The ID of an update must be the name of an lpModel variable, a numeric vector of length 
@@ -174,6 +182,154 @@ shortls = function(env){
 }
 
 
+#'@export
+makeIsotopeVars <- function(poolName, initialAFs){
+  if(!(poolName %in% names(initialAFs))){
+    stop("Initial atomic fractions must be specified for the following pool:", poolName)
+  }
+  isotopeVars <- list(initialAFs[[poolName]], 
+                      structure(rep(NA, times = length(initialAFs[[poolName]])), names = names(initialAFs[[poolName]])),
+                      NA,
+                      NA)
+  names(isotopeVars) <- c(paste0(poolName, ".initialAF"),
+                          paste0(poolName, ".finalAF"), 
+                          paste0(poolName, ".initialDelta"),
+                          paste0(poolName, ".finalDelta"))
+  return(isotopeVars)
+}
 
+#'@export
+makeInitialIsotopeUpdates <- function(poolName, gangstas, initialAFs, drivingValues, isotopeStandards){
 
+  # Write an expression to calculate the initial isotopic atomic fraction, accounting for leak ins
+  pool <- gangsta:::subsetGangstas(gangstas, "class", getOption("gangsta.classes")["pool"])[[poolName]]
+  compoundName <- pool$compoundName
+  molarRatio <- pool$molarRatio
+  
+  # Get variable names  
+  leakInVarName <- paste0("add.to.", compoundName, ".initialMolecules")
+  leakInAFVarNames <- paste0("add.to.", compoundName, ".initialMolecules.AF.", names(initialAFs[[poolName]]) )
+  initialAF <- paste0(poolName, ".initialAF")
+  finalAF <- paste0(poolName, ".finalAF")
+  initialDelta <- paste0(poolName, ".initialDelta")
+  finalDelta <-  paste0(poolName, ".finalDelta")
+  initialPoolVar <- gangsta:::makePoolStartMolVars(poolName)
+  finalPoolVar <- gangsta:::makePoolEndMolVars(poolName)
+  
+  if((leakInVarName %in% names(drivingValues))){
+    initialAFCalculation <- parse(
+      text = paste0(
+        "zeroIfNaN(",
+        "(", finalAF, "* (", initialPoolVar, "-", leakInVarName, ") + ", leakInVarName, "*", molarRatio, "* c(", paste0(leakInAFVarNames, collapse = ","), "))",
+        "/", initialPoolVar, 
+        ")"
+      )
+    )
+  }else{
+    initialAFCalculation <- parse(
+      text = paste0(
+        finalAF
+      )
+    )
+  }
+  
+  updateInitialAF <- list(ID = paste0(poolName, ".initialAF"), 
+                          calculation = initialAFCalculation)
+  return(updateInitialAF)
+}
 
+#'@export
+makeFinalIsotopeUpdates <- function(poolName, gangstas, initialAFs, drivingValues, isotopeStandards){
+  # Get names of transfers into the pool
+  transfers <- gangsta:::subsetGangstas(gangstas, "class", getOption("gangsta.classes")["trans"])
+  transfersIn <- gangsta:::subsetGangstas(transfers, getOption("gangsta.attributes")["toPool"], poolName)
+  transfersInNames <- gangsta:::getGangstaAttribute(transfersIn, "name")
+  transfersInVars <- gangsta:::makeTransferMolTransVars(transfersInNames)
+  
+  # Get names of pools from which elements are transferred into each pool with isotope tracking
+  transfersInFromPoolNames  <- gangsta:::getGangstaAttribute(transfersIn, getOption("gangsta.attributes")["fromPool"])
+  transfersInFromPoolInitVars <- gangsta:::makePoolStartMolVars(transfersInFromPoolNames)
+  transfersInFromPoolInitialAF <- paste0(transfersInFromPoolNames,".initialAF")
+  
+  # Get names of transfers out of each pool with isotope tracking
+  transfersOut <- gangsta:::subsetGangstas(transfers, getOption("gangsta.attributes")["fromPool"], poolName)
+  transfersOutNames <- gangsta:::getGangstaAttribute(transfersOut, "name")
+  transfersOutVars <- gangsta:::makeTransferMolTransVars(transfersOutNames)
+  
+  # Write an expression to calculate the final atomic fraction resulting from transfers in and out
+  pool <- gangsta:::subsetGangstas(gangstas, "class", getOption("gangsta.classes")["pool"])[[poolName]]
+  element <- pool$elementName 
+  compoundName <- pool$compoundName
+  molarRatio <- pool$molarRatio
+  
+  # Get variable names  
+  initialAF <- paste0(poolName, ".initialAF")
+  finalAF <- paste0(poolName, ".finalAF")
+  initialDelta <- paste0(poolName, ".initialDelta")
+  finalDelta <- paste0(poolName, ".finalDelta")
+  initialPoolVar <- gangsta:::makePoolStartMolVars(poolName)
+  finalPoolVar <- gangsta:::makePoolEndMolVars(poolName)
+  
+  # NOTE: assumes isotopic composition is same as initial for entire time step- error could be large? 
+  finalAFCalculation <- parse(
+    text = paste0(
+      "zeroIfNaN(",
+      "(", initialPoolVar, "*", initialAF,
+      "+",paste0(transfersInVars,"*" ,transfersInFromPoolInitialAF, collapse = "+"),
+      "-", paste0(transfersOutVars,"*" ,initialAF, collapse = "+"), ")",
+      "/", finalPoolVar,
+      ")"
+    )
+  )
+  
+  initialDeltaCalculation <- parse(
+    text = paste0(
+      "AFtoDelta(NaIfZero(", initialAF,"[", which.max(as.numeric(names(initialAFs[[poolName]]))), "]),", isotopeStandards[element], ")"
+    )
+  )
+  
+  finalDeltaCalculation <- parse(
+    text = paste0(
+      "AFtoDelta(NaIfZero(", finalAF,"[", which.max(as.numeric(names(initialAFs[[poolName]]))), "]),", isotopeStandards[element], ")"
+    )
+  )
+  
+  # Construct update lists
+  updateFinalAF <- list(ID = paste0(poolName, ".finalAF"), 
+                          calculation = finalAFCalculation)
+  updateInitialDelta <- list(ID = paste0(poolName, ".initialDelta"), 
+                             calculation = initialDeltaCalculation)
+  updateFinalDelta <- list(ID = paste0(poolName, ".finalDelta"), 
+                          calculation = finalDeltaCalculation)
+  
+  updates <- list(updateFinalAF,updateInitialDelta, updateFinalDelta)
+  return(updates)
+}
+
+#'@export
+AFtoDelta <- function (AF, Rst) {
+  R<- AF/(1-AF)
+  delta<- (R/Rst-1)*1000
+  delta
+}
+
+#'@export
+deltaToAF <- function(delta, RStd){
+  RSamp <- (delta/1000+1)*RStd
+  return(RSamp/(RSamp+1))
+}
+
+#'@export
+zeroIfNaN <- function(vec){
+  if(all(is.finite(vec))){
+    vecToReturn <- vec
+  }else{
+    vecToReturn <- structure(rep(0, times = length(vec)), names = names(vec))
+  }
+  return(vecToReturn)
+}
+
+#'@export
+NaIfZero <- function(number){
+  ifelse(number == 0 , NA, number)
+}

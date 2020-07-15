@@ -19,6 +19,11 @@
 #'@param updates placeholder
 #'@param outputRequest A list of output requests. If this argument is not supplied, 
 #' a default set of outputs will be generated. 
+#'@param isotopesToTrack A named list of numeric vectors where names are elements and vectors
+#' contain the atomic weight of the isotope to track
+#'@param initialAtomicFractions A named list of named numeric vectors where the
+#'  names of the list are names of pools, and numeric vectors contain initial
+#'  atomic fractions and are named according to the atomic weight of the isotope
 #'@param ... Named arguments describing model parameters or initial condition
 #'   for state variables where the name of the argument represents the variable
 #'   name that will store the state variable or parameter value within the rapper environment. 
@@ -35,7 +40,10 @@ gangstaRapper <- function(execute = executeGangstaModel,
                           lpModelFilePath, 
                           gangstas,
                           updates = list(),
-                          outputRequest = NA,
+                          outputRequest = defaultOutput(gangstas),
+                          isotopesToTrack = NA,
+                          initialAtomicFractions = NA,
+                          isotopeStandards = NA,
                           ...,
                           initValues = list()){
   # Read the lpModel from file path
@@ -47,9 +55,6 @@ gangstaRapper <- function(execute = executeGangstaModel,
   # Make a data frame of driving values
   drivingValues <- makeDrivingValuesDF(drivingValues = drivingValues, 
                                        leakInDF = leakInDF) 
-
-  # Make output request if NULL
-  if(is.na(outputRequest)){outputRequest <- defaultOutput(gangstas)}
   
   # Get names of lpModelVariables
   lpModelNames <- dimnames(lpModel)[[2]]
@@ -60,6 +65,52 @@ gangstaRapper <- function(execute = executeGangstaModel,
   initialValuesNamesNotInUpdateList <- lpModelNames[grep(".initialMolecules", lpModelNames)]
   initialValuesNamesNotInUpdateList <- initialValuesNamesNotInUpdateList[-grep("x.", initialValuesNamesNotInUpdateList)]
   finalValueNamesNotInUpdateList <- sub("initial", "final", initialValuesNamesNotInUpdateList)
+  
+  # Initialize isotope variable names
+  if(!is.null(isotopesToTrack)){
+    # Get names of all pools containing elements whose isotopes will be tracked
+    elements <- names(isotopesToTrack)
+    poolObjects <- subsetGangstas(gangstas, 
+                                   "class", 
+                                   getOption("gangsta.classes")["pool"])
+    poolObjectsByElement <- lapply(elements,
+                                   subsetGangstas,
+                                   gangstaObjects = poolObjects,
+                                   attributeName = "elementName")
+    poolObjectsWithIsotopeTracking <- unlist(poolObjectsByElement, recursive = F)
+    poolNamesWithIsotopeTracking <- names(poolObjectsWithIsotopeTracking)
+  
+    if(!is.null(initialAtomicFractions)){
+      # Make a list of variables that will store isotopic values as state variables in the wrapper
+      isotopeVars <- unlist(
+        lapply(poolNamesWithIsotopeTracking,
+               makeIsotopeVars, 
+               initialAFs = initialAtomicFractions), 
+        recursive = F)
+      initValues <- c(initValues, isotopeVars)
+      
+      # Make a list of "updates" to be performed after the model run
+      # Updates are specified as required by the update function
+      initialIsotopeUpdates <- lapply(poolNamesWithIsotopeTracking, 
+                                      makeInitialIsotopeUpdates, 
+                                      gangstas = gangstas,
+                                      initialAFs = initialAtomicFractions,
+                                      drivingValues = drivingValues,
+                                      isotopeStandards = isotopeStandards)
+      
+      finalIsotopeUpdates <- lapply(poolNamesWithIsotopeTracking, 
+                                    makeFinalIsotopeUpdates, 
+                                    gangstas = gangstas,
+                                    initialAFs = initialAtomicFractions,
+                                    drivingValues = drivingValues,
+                                    isotopeStandards = isotopeStandards)
+      finalIsotopeUpdates <- unlist(finalIsotopeUpdates, recursive = F)
+      
+    }else{
+      stop("Isotopes were specified for tracking but initial values were not specified")
+    }
+    
+  }
   
   # Create the gangstaRapper object
   gangstaRapper = rapper::rapper(
@@ -72,6 +123,8 @@ gangstaRapper <- function(execute = executeGangstaModel,
     lpModelNames = lpModelNames,
     initialValuesNamesNotInUpdateList = initialValuesNamesNotInUpdateList,
     finalValueNamesNotInUpdateList =  finalValueNamesNotInUpdateList,
+    initialIsotopeUpdates = initialIsotopeUpdates,
+    finalIsotopeUpdates = finalIsotopeUpdates,
     ...,
     initValues = c(initValues, lpModelInitVals)
   )
